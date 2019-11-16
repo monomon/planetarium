@@ -13,12 +13,13 @@
 ;; number of segments in orbit ellipses
 (defparameter *orbit-resolution* 50)
 ;; translate ticks to hours
-(defparameter *hours-per-tick* 1)
-(defparameter *camera-speed* 0.5)
+(defparameter *hours-per-tick* 0.2)
 (defparameter *movement-speed* 1e8)
 ;; angular speed of camera
 (defparameter *rotation-speed* (/ cl:pi 12.0)) ;; degrees
-(defparameter *max-scene-radius* 7e9)
+(defparameter *max-scene-radius* 1e10)
+(defparameter *scale-planets* t)
+(defparameter *sun-radius* 695700)
 
 
 (defstruct planet
@@ -63,27 +64,24 @@
 			(let ((sc-value (sdl2:scancode-value keysym)))
 			  (cond ((sdl2:scancode= sc-value :scancode-escape) (sdl2:push-event :quit)))))
 	(:keydown (:keysym keysym)
-			  (let ((sc-value (sdl2:scancode-value keysym))
-					(viewbox (camera-viewbox camera))
-					(viewmat (camera-viewmat camera))
-					)
+			  (let* ((sc-value (sdl2:scancode-value keysym))
+					 (viewbox (camera-viewbox camera))
+					 (viewmat (camera-viewmat camera))
+					 (forward-vector (3d-vectors:vunit (get-vector-from-row viewmat 2)))
+					 )
 				(cond ((sdl2:scancode= sc-value :scancode-w)
 					   (format t "forward~%")
-					   (let ((trans (3d-matrices:mtranslation
-									 (3d-vectors:v* (get-forward-vector viewmat) *movement-speed* -1.0))))
+					   (let* ((trans-vector (3d-vectors:v* forward-vector *movement-speed*))
+							  (trans (3d-matrices:mtranslation
+									  trans-vector))
+							  (viewcopy (3d-matrices:mcopy viewmat)))
 						 (3d-matrices:nm* viewmat trans)
-						 (let ((ratio (/ (3d-matrices:mcref viewbox 0 0) (3d-matrices:mcref viewmat 2 3))))
-						   (3d-matrices:nmscale viewbox (3d-vectors:vec3 ratio ratio ratio)))
-						 ;; (3d-matrices:nm* viewbox trans)
 						 ))
 					  ((sdl2:scancode= sc-value :scancode-s)
 					   (format t "backward~%")
-					   (let ((trans (3d-matrices:mtranslation
-									 (3d-vectors:v* (get-forward-vector viewmat) *movement-speed*))))
+					   (let* ((trans (3d-matrices:mtranslation
+									  (3d-vectors:v* forward-vector *movement-speed* -1.0))))
 						 (3d-matrices:nm* viewmat trans)
-						 (let ((ratio (/ (3d-matrices:mcref viewbox 0 0) (3d-matrices:mcref viewmat 2 3))))
-						   (format t "Ratio is ~A~%" ratio)
-						   (3d-matrices:nmscale viewbox (3d-vectors:vec3 ratio ratio ratio)))
 						 ))
 					  ((sdl2:scancode= sc-value :scancode-a)
 					   (format t "roll left~%")
@@ -91,7 +89,12 @@
 											 3d-vectors:+vz+ (* -1 *rotation-speed*)))
 					  ((sdl2:scancode= sc-value :scancode-d)
 					   (format t "roll right~%")
-					   (3d-matrices:nmrotate viewmat 3d-vectors:+vz+ *rotation-speed*))
+					   (3d-matrices:nmrotate viewmat
+											 3d-vectors:+vz+ *rotation-speed*))
+					  ((sdl2:scancode= sc-value :scancode-t)
+					   (if (equal *scale-planets* nil)
+						   (setf *scale-planets* t)
+						   (setf *scale-planets* nil)))
 					  ((sdl2:scancode= sc-value :scancode-up)
 					   (format t "pitch down~%")
 					   (3d-matrices:nmrotate viewmat 3d-vectors:+vx+ (* -1 *rotation-speed*)))
@@ -100,10 +103,17 @@
 					   (3d-matrices:nmrotate viewmat 3d-vectors:+vx+ *rotation-speed*))
 					  ((sdl2:scancode= sc-value :scancode-left)
 					   (format t "look left~%")
-					   (3d-matrices:nmrotate viewmat 3d-vectors:+vy+ (* -1 *rotation-speed*)))
+					   (3d-matrices:nmrotate viewmat 3d-vectors:+vy+ *rotation-speed*))
 					  ((sdl2:scancode= sc-value :scancode-right)
 					   (format t "look right~%")
-					   (3d-matrices:nmrotate viewmat 3d-vectors:+vy+ *rotation-speed*)))
+					   (3d-matrices:nmrotate viewmat 3d-vectors:+vy+ (* -1 *rotation-speed*)))
+					  ((sdl2:scancode= sc-value :scancode-period)
+					   (incf *hours-per-tick* 0.2))
+					  ((sdl2:scancode= sc-value :scancode-comma)
+					   (decf *hours-per-tick* 0.2))
+					  ((sdl2:scancode= sc-value :scancode-r)
+					   (setf camera (initialize-camera))))
+				(render planets)
 				(update-camera camera)
 				))))
 
@@ -114,9 +124,9 @@
 (defun initialize-planets (planet-data)
   (mapcar (lambda (p-data) (apply #'make-planet p-data)) planet-data))
 
-(defun get-forward-vector (mat)
+(defun get-vector-from-row (mat row)
   (3d-matrices:with-fast-matref (access-mat mat 4)
-	(3d-vectors:vec3 (access-mat 2 0) (access-mat 2 1) (access-mat 2 2))))
+	(3d-vectors:vec3 (access-mat row 0) (access-mat row 1) (access-mat row 2))))
 
 (defun initialize-camera ()
   (let ((neg-radius (* -1 *max-scene-radius*)))
@@ -125,26 +135,20 @@
 			   (3d-vectors:vec 0 0 neg-radius)
 			   (3d-vectors:vec 0 0 0)
 			   (3d-vectors:vec 0 1 0))
-	 :viewbox (3d-matrices:m*
-			   (3d-matrices:mortho
-				neg-radius *max-scene-radius*
-				neg-radius *max-scene-radius*
-				neg-radius *max-scene-radius*)
-			   (3d-matrices:mtranslation
-				(3d-vectors:v* 3d-vectors:+vz+ *max-scene-radius*))))))
+	 :viewbox (3d-matrices:mperspective
+			   90 1 0.1 *max-scene-radius*
+			   )
+	 )))
 
 (defun update-camera (cam)
   (let ((viewmat (camera-viewmat cam))
 		(viewbox (camera-viewbox cam)))
 
-	;; (gl:matrix-mode :modelview)
 	(gl:load-matrix (3d-matrices:marr
 					 (3d-matrices:mtranspose
 					  (3d-matrices:m* viewbox viewmat))))
 	(format t "view~%~A~%" (3d-matrices:write-matrix viewmat nil))
 
-	;; (gl:matrix-mode :projection)
-	;; (gl:load-matrix (3d-matrices:marr (3d-matrices:mtranspose viewbox)))
 	(format t "projection~%~A~%" (3d-matrices:write-matrix viewbox nil))))
 
 (defun setup-gl (win gl-context camera)
@@ -197,16 +201,20 @@
 (defun draw-planet (p time)
   (gl:push-matrix)
   (gl:rotate (planet-orbit-inclination p) 0 1 0)
-  (gl:push-matrix)
+  ;; (gl:push-matrix)
   (draw-orbit p)
-  (destructuring-bind (x y z) (calculate-position-from-time p time) (gl:translate x y z))
+  (destructuring-bind (x y z)
+	  (calculate-position-from-time p (/ time 24.0))
+	(gl:translate x y z))
   (gl:color 1.0 0.0 0.0 1.0)
   (let ((q (glu:new-quadric)))
-			  (glu:sphere q
-						  (max (* 1e3 (/ (planet-diameter p) 2.0)) 2e7)
-						  *sphere-resolution*
-						  *sphere-resolution*))
-  (gl:pop-matrix)
+	(glu:sphere q
+				(if (equal *scale-planets* t)
+					(max (* 1e2 (/ (planet-diameter p) 2.0)) 2e7)
+					(/ (planet-diameter p) 2.0))
+				*sphere-resolution*
+				*sphere-resolution*))
+  ;; (gl:pop-matrix)
   (gl:pop-matrix))
 
 (defun render (planets)
@@ -214,14 +222,15 @@
   (gl:light :light0 :position (vector .8 .8 .8 1))
   (gl:enable :blend :texture-2d)
   (gl:color 1.0 0.0 0.0 1.0)
-  ;; (gl:matrix-mode :modelview)
-  (dolist (planet planets)
-	(draw-planet planet (* (sdl2:get-ticks) *hours-per-tick*)))
   ;; draw sun
   (gl:color 1.0 1.0 0.0 1.0)
   (let ((q (glu:new-quadric)))
   	(glu:sphere q
-  				(* 695700 1e2)
+  				(if (equal *scale-planets* t)
+					(* *sun-radius* 1e1)
+					*sun-radius*)
   				*sphere-resolution*
   				*sphere-resolution*))
+  (dolist (planet planets)
+	(draw-planet planet (* (sdl2:get-ticks) *hours-per-tick*)))
   (gl:flush))

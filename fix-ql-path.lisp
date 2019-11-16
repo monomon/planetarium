@@ -1,7 +1,7 @@
 (setf ql:*local-project-directories* (append (list #P"/mnt/data/Projects/planetarium/") ql:*local-project-directories*))
+;; "/usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0"
 (ql:quickload 'planetarium)
 (planetarium::main)
-;; "/usr/lib/x86_64-linux-gnu/libSDL2-2.0.so.0"
 (ql:update-all-dists)
 (ql:update-client)
 (ql:quickload 'cffi)
