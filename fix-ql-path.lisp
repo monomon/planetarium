@@ -3,6 +3,7 @@
 (ql:quickload 'planetarium)
 (planetarium::main)
 (ql:update-all-dists)
+(merge-pathnames (asdf:system-source-directory :planetarium) "planets.sexp")
 (ql:update-client)
 (ql:quickload 'cffi)
 

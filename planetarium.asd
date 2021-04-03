@@ -6,6 +6,6 @@
   :license  "MIT"
   :version "0.0.1"
   :serial t
-  :depends-on (#:sdl2 #:cl-opengl #:cl-glu #:3d-vectors #:3d-matrices)
+  :depends-on (#:sdl2 #:cl-opengl #:cl-glu #:cl-jpeg #:3d-vectors #:3d-matrices #:alexandria)
   :components ((:file "package")
                (:file "planetarium")))
