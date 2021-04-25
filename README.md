@@ -6,6 +6,8 @@ It uses OpenGL and SDL for graphics and ui.
 
 Data mostly from [nasa factsheet](https://nssdc.gsfc.nasa.gov/planetary/factsheet/).
 
+Textures from [solarsystemscope](https://www.solarsystemscope.com)
+
 ## Starting
 
 Add Planetarium to the quickload load path and start its main function
