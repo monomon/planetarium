@@ -62,19 +62,19 @@
 			      sdl2-ffi:+sdl-major-version+
 			      sdl2-ffi:+sdl-minor-version+
 			      sdl2-ffi:+sdl-patchlevel+)
-	  (let* ((planets (initialize-planets (load-planet-data)))
-		       (planet-state (initialize-planet-state planets))
-		       (sun (make-star
-				         :name "sun"
-				         :diameter (* *sun-radius* 2)))
-		       (camera (initialize-camera)))
-	    (format t "view~%~A~%" (3d-matrices:write-matrix (camera-viewmat camera) nil))
-	    (format t "projection~%~A~%" (3d-matrices:write-matrix (camera-viewbox camera) nil))
-      (format t "planet state: ~A~%" (maphash #'(lambda (k v) (format nil "~a => ~a~%" k v)) planet-state))
-	    (sdl2:with-window (win :flags '(:opengl))
-		    (sdl2:with-gl-context (gl-context win)
-		      (setup-gl win gl-context camera)
-		      (main-loop win #'render planets planet-state sun camera))))))
+    (let ((camera (initialize-camera)))
+      (sdl2:with-window (win :flags '(:opengl))
+        (sdl2:with-gl-context (gl-context win)
+          (setup-gl win gl-context camera)
+          (let* ((planets (initialize-planets (load-planet-data)))
+                 (planet-state (initialize-planet-state planets))
+                 (sun (make-star
+                       :name "sun"
+                       :diameter (* *sun-radius* 2))))
+            (format t "view~%~A~%" (3d-matrices:write-matrix (camera-viewmat camera) nil))
+            (format t "projection~%~A~%" (3d-matrices:write-matrix (camera-viewbox camera) nil))
+            (format t "planet state: ~A~%" (maphash #'(lambda (k v) (format nil "~a => ~a~%" k v)) planet-state))
+            (main-loop win #'render planets planet-state sun camera)))))))
 
 (defun main-loop (win render-fn planets planet-state sun camera)
   (sdl2:with-event-loop (:method :poll)
@@ -331,11 +331,10 @@
      (3d-vectors:vx pp)
      (3d-vectors:vy pp)
      (3d-vectors:vz pp)))
-  (gl:color 1.0 0.0 0.0 1.0)
+  (gl:color 1.0 1.0 1.0 1.0)
   (let ((q (glu:new-quadric)))
     (if (planet-state-texture-id ps)
-        (progn (gl:enable :texture-gen-s)
-               (gl:enable :texture-gen-t)
+        (progn
                (glu:quadric-texture q :true)
                (gl:bind-texture :texture-2d (planet-state-texture-id ps)))
       (glu:quadric-texture q :false))
@@ -345,7 +344,9 @@
 					          (* (/ (planet-diameter p) 2.0) *scale-factor*))
 				        *sphere-resolution*
 				        *sphere-resolution*))
-  (gl:pop-matrix))
+  (gl:bind-texture :texture-2d 0)
+  (gl:pop-matrix)
+  )
 
 (defun draw-star (s time)
   (gl:push-matrix)
