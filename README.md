@@ -1,5 +1,7 @@
 # Planetarium
 
+![planetarium-screen](planetarium.png)
+
 This is a solar system model.
 
 It uses OpenGL and SDL for graphics and ui.
